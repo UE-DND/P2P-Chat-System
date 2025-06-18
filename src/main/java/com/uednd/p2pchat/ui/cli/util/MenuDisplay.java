@@ -27,7 +27,8 @@ public class MenuDisplay {
 
     /**
      * 清空当前行并将光标移动到行首
-     * 常用于聊天界面，当收到新消息时清除用户正在输入的内容，
+     * <p>
+     * 用于聊天界面，当收到新消息时清除用户正在输入的内容，
      * 显示新消息后再重新显示用户输入提示
      */
     public static void clearCurrentLine() {
@@ -35,7 +36,7 @@ public class MenuDisplay {
     }
 
     /**
-     * 新增：打印分隔线的方法
+     * 打印分隔线的方法
      * @param title 标题 (可为 null)
      */
     public static void printSeparator(String title) {

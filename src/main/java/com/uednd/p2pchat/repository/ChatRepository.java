@@ -1,7 +1,12 @@
 package com.uednd.p2pchat.repository;
 
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.uednd.p2pchat.model.Message;
 import com.uednd.p2pchat.model.User;
@@ -31,7 +36,6 @@ public class ChatRepository {
     
     /**
      * 初始化数据库连接
-     * 
      * @throws SQLException 如果数据库连接失败则抛出异常
      */
     public void initDatabase() throws SQLException {
@@ -78,18 +82,6 @@ public class ChatRepository {
         // System.out.println("DEBUG: [ChatRepository::initDatabase] - 数据库初始化完成");
     }
     
-    /**
-     * 关闭数据库连接
-     * @throws SQLException 如果关闭失败则抛出异常
-     */
-    public void closeConnection() throws SQLException {
-        // System.out.println("DEBUG: [ChatRepository::closeConnection] - 关闭数据库连接");
-        if (connection != null && !connection.isClosed()) {
-            connection.close();
-            connection = null;
-            // System.out.println("DEBUG: [ChatRepository::closeConnection] - 数据库连接已关闭");
-        }
-    }
     
     /**
      * 保存用户信息
@@ -219,5 +211,18 @@ public class ChatRepository {
         // int rowsAffected = clear_chat_history.executeUpdate(to_clear_chat_history);
         // System.out.println("DEBUG: [ChatRepository::clearChatHistory] - 已清除 " + rowsAffected + " 条聊天记录");
         clear_chat_history.close();
+    }
+
+    /**
+     * 关闭数据库连接
+     * @throws SQLException 如果关闭失败则抛出异常
+     */
+    public void closeConnection() throws SQLException {
+        // System.out.println("DEBUG: [ChatRepository::closeConnection] - 关闭数据库连接");
+        if (connection != null && !connection.isClosed()) {
+            connection.close();
+            connection = null;
+            // System.out.println("DEBUG: [ChatRepository::closeConnection] - 数据库连接已关闭");
+        }
     }
 } 

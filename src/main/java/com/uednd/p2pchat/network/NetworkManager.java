@@ -56,6 +56,26 @@ public class NetworkManager {
     }
     
     /**
+     * 获取连接的客户端IP地址
+     * @return 客户端IP地址
+     */
+    public String getConnectedClientIp() {
+        if (socket_to_client != null)
+            return socket_to_client.getInetAddress().getHostAddress();
+        return null;
+    }
+    
+    /**
+     * 获取连接的客户端端口
+     * @return 客户端端口
+     */
+    public int getConnectedClientPort() {
+        if (socket_to_client != null)
+            return socket_to_client.getPort();
+        return 11451;
+    }
+
+    /**
      * 启动服务器，并设置超时
      * @param timeout 超时时间（毫秒）
      * @throws IOException 如果启动失败则抛出异常
@@ -126,26 +146,6 @@ public class NetworkManager {
     }
     
     /**
-     * 发送文本消息
-     * @param message 要发送的消息
-     */
-    public void sendTextMessage(String message) {
-        // System.out.println("DEBUG: [NetworkManager::sendTextMessage] - 发送消息: " + message);
-        textOut.println(message);  // 字符串传入输出流
-    }
-    
-    /**
-     * 接收文本消息
-     * @return 接收到的消息
-     * @throws IOException 如果接收失败则抛出异常
-     */
-    public String receiveTextMessage() throws IOException {
-        String message = textIn.readLine();  // 从输入流中读取一行文本
-        // System.out.println("DEBUG: [NetworkManager::receiveTextMessage] - 接收消息: " + message);
-        return message;
-    }
-    
-    /**
      * 发送握手消息
      * @param message 要发送的握手消息
      */
@@ -165,6 +165,26 @@ public class NetworkManager {
         return message;
     }
     
+    /**
+     * 发送文本消息
+     * @param message 要发送的消息
+     */
+    public void sendTextMessage(String message) {
+        // System.out.println("DEBUG: [NetworkManager::sendTextMessage] - 发送消息: " + message);
+        textOut.println(message);  // 字符串传入输出流
+    }
+    
+    /**
+     * 接收文本消息
+     * @return 接收到的消息
+     * @throws IOException 如果接收失败则抛出异常
+     */
+    public String receiveTextMessage() throws IOException {
+        String message = textIn.readLine();  // 从输入流中读取一行文本
+        // System.out.println("DEBUG: [NetworkManager::receiveTextMessage] - 接收消息: " + message);
+        return message;
+    }
+
     /**
      * 发送文件
      * @param file 要发送的文件对象
@@ -239,26 +259,6 @@ public class NetworkManager {
         return connected;
     }
     
-    /**
-     * 获取连接的客户端IP地址
-     * @return 客户端IP地址
-     */
-    public String getConnectedClientIp() {
-        if (socket_to_client != null)
-            return socket_to_client.getInetAddress().getHostAddress();
-        return null;
-    }
-    
-    /**
-     * 获取连接的客户端端口
-     * @return 客户端端口
-     */
-    public int getConnectedClientPort() {
-        if (socket_to_client != null)
-            return socket_to_client.getPort();
-        return 11451;
-    }
-
     /**
      * 关闭整个网络管理器，包括监听socket。
      * 应用退出时调用。
