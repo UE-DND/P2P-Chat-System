@@ -64,42 +64,17 @@ public class FileTransferService {
         }
         // System.out.println("DEBUG: [FileTransferService::构造函数] - 下载目录确认可用");
     }
-    
+
+
     /**
-     * 发送文件
-     * @param filePath 要发送的文件路径
-     * @throws IOException 如果发送失败则抛出异常
-     * @throws SQLException 如果保存消息记录失败则抛出异常
+     * 检查消息是否是文件类型
+     * @param message 消息内容
+     * @return 如果是文件类型则返回true，否则返回false
      */
-    public void sendFile(String filePath) throws IOException, SQLException {
-        // System.out.println("DEBUG: [FileTransferService::sendFile] - 准备发送文件: " + filePath);
-        File file = new File(filePath);
-        
-        // 检查网络连接
-        if (!networkManager.isConnected()) {
-            // System.out.println("DEBUG: [FileTransferService::sendFile] - 未连接到对方，无法发送文件");
-            throw new IOException("未连接到对方，无法发送文件");
-        }
-        
-        // 发送文件前先发送文件标识
-        // System.out.println("DEBUG: [FileTransferService::sendFile] - 发送文件标识消息");
-        networkManager.sendTextMessage("FILE:" + file.getName());
-
-        // 创建文件信息对象
-        // System.out.println("DEBUG: [FileTransferService::sendFile] - 创建文件信息对象，文件大小: " + file.length() + " 字节");
-        FileInfo fileInfo = createFileInfo(file);
-
-        // 发送文件数据，传入要发送的文件对象
-        // System.out.println("DEBUG: [FileTransferService::sendFile] - 发送文件数据中...");
-        networkManager.sendFile(fileInfo);
-        
-        // 保存消息记录
-        Message message = new Message(localUsername, opposite_Username, "发送文件: " + file.getName(), filePath);
-        message.setType("FILE");
-        dbManager.saveMessage(message);
-        
-        System.out.println("文件发送成功: " + file.getName() + " (" + file.length() + " 字节)");
-        // System.out.println("DEBUG: [FileTransferService::sendFile] - 文件发送完成并保存消息记录");
+    public static boolean isFileMessage(String message) {
+        boolean isFile = message != null && message.startsWith("FILE:");
+        // System.out.println("DEBUG: [FileTransferService::isFileMessage] - 检查消息是否是文件标识: " + message + " -> " + isFile);
+        return isFile;
     }
     
     /**
@@ -138,6 +113,43 @@ public class FileTransferService {
                     opposite_Username
             );
         }
+    }
+
+    /**
+     * 发送文件
+     * @param filePath 要发送的文件路径
+     * @throws IOException 如果发送失败则抛出异常
+     * @throws SQLException 如果保存消息记录失败则抛出异常
+     */
+    public void sendFile(String filePath) throws IOException, SQLException {
+        // System.out.println("DEBUG: [FileTransferService::sendFile] - 准备发送文件: " + filePath);
+        File file = new File(filePath);
+        
+        // 检查网络连接
+        if (!networkManager.isConnected()) {
+            // System.out.println("DEBUG: [FileTransferService::sendFile] - 未连接到对方，无法发送文件");
+            throw new IOException("未连接到对方，无法发送文件");
+        }
+        
+        // 发送文件前先发送文件标识
+        // System.out.println("DEBUG: [FileTransferService::sendFile] - 发送文件标识消息");
+        networkManager.sendTextMessage("FILE:" + file.getName());
+
+        // 创建文件信息对象
+        // System.out.println("DEBUG: [FileTransferService::sendFile] - 创建文件信息对象，文件大小: " + file.length() + " 字节");
+        FileInfo fileInfo = createFileInfo(file);
+
+        // 发送文件数据，传入要发送的文件对象
+        // System.out.println("DEBUG: [FileTransferService::sendFile] - 发送文件数据中...");
+        networkManager.sendFile(fileInfo);
+        
+        // 保存消息记录
+        Message message = new Message(localUsername, opposite_Username, "发送文件: " + file.getName(), filePath);
+        message.setType("FILE");
+        dbManager.saveMessage(message);
+        
+        System.out.println("文件发送成功: " + file.getName() + " (" + file.length() + " 字节)");
+        // System.out.println("DEBUG: [FileTransferService::sendFile] - 文件发送完成并保存消息记录");
     }
     
     /**
@@ -192,16 +204,5 @@ public class FileTransferService {
             // System.out.println("DEBUG: [FileTransferService::receiveFile] - IO异常: " + e.getMessage());
             throw e;
         }
-    }
-    
-    /**
-     * 检查消息是否是文件类型
-     * @param message 消息内容
-     * @return 如果是文件类型则返回true，否则返回false
-     */
-    public static boolean isFileMessage(String message) {
-        boolean isFile = message != null && message.startsWith("FILE:");
-        // System.out.println("DEBUG: [FileTransferService::isFileMessage] - 检查消息是否是文件标识: " + message + " -> " + isFile);
-        return isFile;
     }
 } 

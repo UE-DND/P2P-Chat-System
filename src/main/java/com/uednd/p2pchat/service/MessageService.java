@@ -82,7 +82,7 @@ public class MessageService extends BackgroundService {
     }
     
     /**
-     * 接收消息
+     * 接收文本消息
      * @throws Exception 如果接收失败则抛出异常
      */
     @Override
