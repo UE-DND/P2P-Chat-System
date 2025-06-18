@@ -1,0 +1,177 @@
+@startuml P2P聊天系统协作图
+
+' =========== 全局样式设置 ===========
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 14
+skinparam roundCorner 10
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 180
+skinparam ranksep 200
+skinparam padding 15
+skinparam defaultTextAlignment center
+skinparam ArrowFontSize 12
+skinparam ObjectBorderThickness 2
+skinparam minClassWidth 150
+skinparam ObjectAttributeFontSize 12
+
+' 共享样式定义
+' 定义组件颜色
+!$entryColor = "CCFFCC"
+!$controlColor = "FFFFCC"
+!$connColor = "ADD8E6"
+!$sessionColor = "FFCCCC"
+!$dataColor = "E6E6FA"
+!$commandColor = "D0E0FF"
+!$toolColor = "FFE6E6"
+
+title P2P聊天系统协作图 - 纵向布局
+
+' 定义核心组件 - 纵向布局排列
+' 1. 系统入口和控制组件
+object "用户" as User #$entryColor
+object "P2PChatApplication" as Main #$entryColor
+object "CliController" as Controller #$controlColor
+object "DirectoryUtils" as DirUtils #$entryColor
+
+' 2. 网络组件
+object "NetworkManager" as NetMan #$connColor
+object "ConnectionHandler" as ConnHandler #$connColor
+object "NetworkUtils" as NetUtils #$controlColor
+
+' 3. 会话组件
+object "ChatSession" as Session #$sessionColor
+object "MessageService" as MsgService #$sessionColor
+object "FileTransferService" as FileService #$sessionColor
+
+' 4. 命令组件
+object "Command\n(接口)" as CmdInterface #$commandColor
+object "HelpCommand" as HelpCmd #$commandColor
+object "FileCommand" as FileCmd #$commandColor
+object "ExitCommand" as ExitCmd #$commandColor
+object "HistoryCommand" as HistoryCmd #$commandColor
+object "ClearCommand" as ClearCmd #$commandColor
+
+' 5. 数据组件
+object "User\n(本地用户)" as LocalUser #$connColor
+object "User\n(远程用户)" as RemoteUser #$connColor
+object "Message" as Msg #$dataColor
+object "FileInfo" as FileInfo #$dataColor
+object "ChatRepository" as ChatRepo #$controlColor
+
+' 6. 辅助工具组件
+object "MenuDisplay" as Menu #$toolColor
+object "InputHandler" as Input #$toolColor
+object "MessageHandler" as MsgHandler #$toolColor
+
+' =========== 系统启动和初始化流程 ===========
+' 调整为更纵向的流程表示
+User --> Main : 1: 启动应用程序
+Main --> DirUtils : 2: createDirectoryIfNotExists("downloads")
+Main --> Controller : 3: 创建控制器
+
+' 控制器初始化
+Controller --> NetUtils : 4: getLocalHostname()
+Controller --> Controller : 5: getPortFromUser()
+Controller --> NetMan : 6: 创建网络管理器
+Controller --> ChatRepo : 7: 创建聊天仓库
+Controller --> LocalUser : 8: 创建本地用户
+Controller --> Menu : 9: 显示主菜单
+
+' =========== 连接建立流程 ===========
+' 连接相关 - 纵向流程
+User --> Controller : 10: 选择发送/接收模式
+Controller --> ConnHandler : 11: 创建连接处理器
+ConnHandler --> User : 12: 提示输入连接信息
+User --> ConnHandler : 13: 输入远程用户信息
+ConnHandler --> NetMan : 14: 建立连接(连接服务器/等待连接)
+NetMan --> NetMan : 15: 发送/接收握手消息
+ConnHandler --> RemoteUser : 16: 创建远程用户对象
+ConnHandler --> Controller : 17: 返回远程用户信息
+Controller --> Session : 18: 创建聊天会话
+
+' =========== 会话初始化 ===========
+' 会话创建命令和服务 - 纵向布局
+Session --> HelpCmd : 19: 创建Help命令
+Session --> FileCmd : 20: 创建File命令
+Session --> ExitCmd : 21: 创建Exit命令
+Session --> HistoryCmd : 22: 创建History命令
+Session --> ClearCmd : 23: 创建Clear命令
+Session --> FileService : 24: 创建文件传输服务
+Session --> MsgService : 25: 创建消息服务
+Session --> MsgHandler : 26: 创建消息处理器
+Session --> ChatRepo : 27: 加载聊天历史
+MsgService --> MsgService : 28: start()后台线程
+
+' =========== 命令模式关系 ===========
+' 命令处理 - 纵向关系
+CmdInterface <|-- HelpCmd : 实现
+CmdInterface <|-- FileCmd : 实现
+CmdInterface <|-- ExitCmd : 实现
+CmdInterface <|-- HistoryCmd : 实现
+CmdInterface <|-- ClearCmd : 实现
+Session --> CmdInterface : 管理和调用
+
+' =========== 消息收发流程 ===========
+' 消息发送流程 - 纵向表示
+User --> Session : A1: 输入消息
+Session --> Input : A2: 读取输入
+Input --> Session : A3: 返回输入内容
+Session --> MsgService : A4: 发送消息
+MsgService --> NetMan : A5: 通过网络发送
+MsgService --> Msg : A6: 创建消息对象
+MsgService --> ChatRepo : A7: 保存消息
+
+' 消息接收流程 - 纵向表示
+NetMan --> MsgService : B1: 接收网络数据
+MsgService --> MsgHandler : B2: 处理接收数据
+MsgHandler --> Session : B3: 处理接收消息
+Session --> User : B4: 显示接收消息
+
+' =========== 文件传输流程 ===========
+' 文件发送 - 纵向表示
+User --> Session : C1: 输入 /file 命令
+Session --> FileCmd : C2: 调用File命令
+FileCmd --> FileService : C3: 发送文件
+FileService --> NetMan : C4: 发送文件数据
+FileService --> FileInfo : C5: 创建文件信息
+FileService --> ChatRepo : C6: 记录文件传输
+
+' 文件接收 - 纵向表示
+MsgHandler --> Session : D1: 检测文件传输请求
+Session --> FileService : D2: 接收文件
+FileService --> NetMan : D3: 接收文件数据
+FileService --> User : D4: 通知文件接收成功
+
+' =========== 会话结束流程 ===========
+' 退出处理 - 纵向表示
+User --> Session : E1: 输入 /exit 命令
+Session --> ExitCmd : E2: 调用Exit命令
+ExitCmd --> MsgService : E3: 停止消息服务
+ExitCmd --> NetMan : E4: 关闭连接
+ExitCmd --> Session : E5: 返回false终止循环
+Session --> Controller : E6: 返回主菜单
+
+' 核心组件间关系
+note right of Session
+  <b>ChatSession是系统核心类</b>
+  负责协调命令处理、消息收发和文件传输
+end note
+
+note bottom of User
+  <b>交互流程说明:</b>
+  数字序号(1-28): 系统启动到会话初始化的流程
+  字母+数字(A1-A7, B1-B4): 消息收发流程
+  字母+数字(C1-C6, D1-D4): 文件传输流程
+  字母+数字(E1-E6): 会话结束流程
+end note
+
+' 设置全局图表布局和大小
+top to bottom direction
+scale max 2200 width
+scale max 5000 height
+
+@enduml 

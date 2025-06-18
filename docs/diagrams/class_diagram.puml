@@ -1,0 +1,371 @@
+@startuml P2P聊天系统类图
+
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 14
+skinparam roundCorner 10
+skinparam shadowing false
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  AttributeFontColor #000000
+  AttributeFontSize 12
+  AttributeIconSize 12
+}
+
+skinparam note {
+  BackgroundColor #FFFACD
+  BorderColor #000000
+}
+
+title P2P_Chat_System - 类图
+
+package "com.uednd.p2pchat" {
+  class P2PChatApplication {
+    - {static} SQL_PATH: String
+    - {static} DOWNLOAD_PATH: String
+    + {static} main(args: String[]): void
+  }
+}
+
+package "com.uednd.p2pchat.core" {
+  abstract class BackgroundService {
+    - backgroundThread: Thread
+    - running: boolean
+    + start(): void
+    + stop(): void
+    + isRunning(): boolean
+    # abstract task(): void
+  }
+}
+
+package "com.uednd.p2pchat.util" {
+  class DirectoryUtils {
+    + {static} createDirectoryIfNotExists(dirPath: String): boolean
+  }
+  
+  class NetworkUtils {
+    + {static} getLocalHostname(): String
+    + {static} getLocalIpAddress(): String
+    + {static} isPortAvailable(port: int): boolean
+  }
+  
+  class ANSIcolor {
+    + {static} RESET: String
+    + {static} BLACK: String
+    + {static} RED: String
+    + {static} GREEN: String
+    + {static} YELLOW: String
+    + {static} BLUE: String
+    + {static} PURPLE: String
+    + {static} CYAN: String
+    + {static} WHITE: String
+  }
+}
+
+package "com.uednd.p2pchat.ui.cli" {
+  class CliController {
+    - scanner: Scanner
+    - chat_history: ChatRepository
+    - networkManager: NetworkManager
+    - localUser: User
+    + CliController(sql_path: String, download_path: String)
+    - getLocalHostname(user_defined_port: int): String
+    - getPortFromUser(): int
+    - setupLocalUser(hostname: String): void
+    - showMainMenu(download_path: String): void
+    - sendMode(download_path: String): void
+    - receiveMode(download_path: String): void
+    - receiveMessageMode(downloadPath: String): void
+    - closeResources(): void
+  }
+
+  class ChatSession {
+    - {static} CHAT_CLOSE_NOTIFY: String
+    - scanner: Scanner
+    - networkManager: NetworkManager
+    - sql_path: ChatRepository
+    - localUser: User
+    - opposite_User: User
+    - download_path: String
+    - messageService: MessageService
+    - fileTransferService: FileTransferService
+    - commands: List<Command>
+    + ChatSession(scanner: Scanner, networkManager: NetworkManager, sql_path: ChatRepository, localUser: User, opposite_User: User, downloadPath: String)
+    - initCommands(): void
+    + start(): void
+    - createMessageHandler(): MessageHandler
+    - runChatLoop(): void
+    - initializeFileTransferService(): void
+    - showChatHistory(): void
+    - handleCommand(commandStr: String): boolean
+    - handleFileReceive(): void
+    + shutdownChat(notify_opposite_user: boolean): void
+  }
+
+  class ConnectionHandler {
+    - scanner: Scanner
+    - networkManager: NetworkManager
+    - localUser: User
+    + ConnectionHandler(scanner: Scanner, networkManager: NetworkManager, localUser: User)
+    + establishConnection(): User
+    - getTargetIP(): String
+    - getTargetPort(): int
+    - performHandshake(): User
+    + {static} waitForConnection(networkManager: NetworkManager, localUser: User, chatRepository: ChatRepository, downloadPath: String): void
+    - {static} performServerHandshake(networkManager: NetworkManager, localUser: User): User
+  }
+  
+  package "com.uednd.p2pchat.ui.cli.util" {
+    class InputHandler {
+      + {static} waitForEnter(scanner: Scanner, message: String): void
+      + {static} checkInputAvailable(scanner: Scanner): boolean
+      + {static} readInput(scanner: Scanner): String
+    }
+    
+    class MenuDisplay {
+      + {static} clearScreen(): void
+      + {static} printSeparator(title: String): void
+      + {static} printMenu(title: String, options: String[]): void
+    }
+  }
+}
+
+package "com.uednd.p2pchat.network" {
+  class NetworkManager {
+    - port_listening: ServerSocket
+    - socket_to_client: Socket
+    - socket_to_server: Socket
+    - textIn: BufferedReader
+    - textOut: PrintWriter
+    - fileIn: ObjectInputStream
+    - fileOut: ObjectOutputStream
+    - port: int
+    + NetworkManager(port: int)
+    + startServer(timeout: int): void
+    + waitForConnection(): void
+    + connectToServer(opposite_UserIP: String, opposite_UserPort: int): void
+    - initStreams(socket: Socket): void
+    + sendTextMessage(message: String): void
+    + receiveTextMessage(): String
+    + sendHandshakeMessage(message: String): void
+    + receiveHandshakeMessage(): String
+    + sendFile(file: Object): void
+    + receiveFile(): Object
+    + closeConnection(): void
+    + isConnected(): boolean
+    + getConnectedClientIp(): String
+    + getConnectedClientPort(): int
+    + shutdown(): void
+  }
+}
+
+package "com.uednd.p2pchat.repository" {
+  class ChatRepository {
+    - sql_path: String
+    - connection: Connection
+    + ChatRepository(sql_path: String)
+    + initDatabase(): void
+    + closeConnection(): void
+    + saveUser(user: User): void
+    + saveMessage(message: Message): void
+    + getChatHistory(user1: String, user2: String): List<Message>
+    + clearChatHistory(user1: String, user2: String): void
+  }
+}
+
+package "com.uednd.p2pchat.service" {
+  class MessageService extends BackgroundService {
+    - networkManager: NetworkManager
+    - dbManager: ChatRepository
+    - localUsername: String
+    - opposite_Username: String
+    - messageHandler: MessageHandler
+    + MessageService(networkManager: NetworkManager, dbManager: ChatRepository, localUsername: String, opposite_Username: String, handler: MessageHandler)
+    + sendTextMessage(message: String): void
+    + getChatHistory(): List<Message>
+    + clearChatHistory(): void
+    # task(): void
+  }
+  
+  interface "MessageService$MessageHandler" as MessageHandler {
+    + handleMessage(message: String): void
+    + handleError(message: String): void
+  }
+  
+  MessageService +-- MessageHandler
+
+  class FileTransferService {
+    - {static} MAX_FILE_SIZE: long
+    - networkManager: NetworkManager
+    - dbManager: ChatRepository
+    - localUsername: String
+    - opposite_Username: String
+    - download_path: String
+    + FileTransferService(networkManager: NetworkManager, dbManager: ChatRepository, localUsername: String, opposite_Username: String, download_path: String)
+    + sendFile(filePath: String): void
+    - createFileInfo(file: File): FileInfo
+    + receiveFile(): String
+    + {static} isFileMessage(message: String): boolean
+  }
+}
+
+package "com.uednd.p2pchat.model" {
+  class User {
+    - username: String
+    - ipAddress: String
+    - port: int
+    + User(username: String, ipAddress: String, port: int)
+    + getUsername(): String
+    + setUsername(username: String): void
+    + getIpAddress(): String
+    + setIpAddress(ipAddress: String): void
+    + getPort(): int
+    + setPort(port: int): void
+  }
+
+  class Message {
+    - sender: String
+    - receiver: String
+    - content: String
+    - type: String
+    - filePath: String
+    - timestamp: long
+    + Message()
+    + Message(sender: String, receiver: String, content: String)
+    + Message(sender: String, receiver: String, content: String, filePath: String)
+    + getSender(): String
+    + setSender(sender: String): void
+    + getReceiver(): String
+    + setReceiver(receiver: String): void
+    + getContent(): String
+    + setContent(content: String): void
+    + getType(): String
+    + setType(type: String): void
+    + getFilePath(): String
+    + setFilePath(filePath: String): void
+    + getTimestamp(): long
+    + setTimestamp(timestamp: long): void
+    + toString(): String
+  }
+
+  class FileInfo {
+    - fileName: String
+    - fileSize: long
+    - fileData: byte[]
+    - sender: String
+    - receiver: String
+    + FileInfo(fileName: String, fileSize: long, fileData: byte[], sender: String, receiver: String)
+    + getFileName(): String
+    + getFileSize(): long
+    + getFileData(): byte[]
+    + getSender(): String
+    + getReceiver(): String
+  }
+}
+
+package "com.uednd.p2pchat.ui.cli.command" {
+  interface Command {
+    + execute(scanner: Scanner, localUser: User, \noppositeUser: User, messageService: MessageService, \nfileTransferService: FileTransferService, \nchatRepository: ChatRepository): boolean
+    + getName(): String
+    + getDescription(): String
+  }
+
+  class HelpCommand implements Command {
+    - commands: List<Command>
+    + HelpCommand(commands: List<Command>)
+    + getName(): String
+    + getDescription(): String
+  }
+  
+  class ExitCommand implements Command {
+    - networkManager: NetworkManager
+    + ExitCommand(networkManager: NetworkManager)
+    - shutdownChat(messageService: MessageService, notify_opposite_user: boolean): void
+    + getName(): String
+    + getDescription(): String
+  }
+  
+  class FileCommand implements Command {
+    + getName(): String
+    + getDescription(): String
+  }
+  
+  class HistoryCommand implements Command {
+    + getName(): String
+    + getDescription(): String
+  }
+  
+  class ClearCommand implements Command {
+    + getName(): String
+    + getDescription(): String
+  }
+}
+
+' 主要关系
+P2PChatApplication --> CliController : "启动"
+
+CliController --> NetworkUtils : "获取网络信息"
+CliController --> NetworkManager : "创建"
+CliController --> ChatRepository : "创建"
+CliController --> User : "创建本地用户"
+CliController ..> ConnectionHandler : "使用"
+
+ConnectionHandler --> NetworkManager : "使用"
+ConnectionHandler --> ChatSession : "创建"
+
+ChatSession --> Command : "注册和执行"
+ChatSession --> MessageService : "创建和使用"
+ChatSession --> FileTransferService : "创建和使用"
+ChatSession ..> User : "关联用户"
+ChatSession ..> ChatRepository : "使用"
+ChatSession ..> InputHandler : "处理输入"
+ChatSession ..> MenuDisplay : "显示界面"
+
+MessageService --|> BackgroundService : "继承"
+MessageService --> NetworkManager : "使用"
+MessageService --> ChatRepository : "使用"
+MessageService ..> Message : "创建"
+
+FileTransferService --> NetworkManager : "使用"
+FileTransferService --> ChatRepository : "使用"
+FileTransferService --> FileInfo : "创建和使用"
+FileTransferService ..> Message : "创建"
+
+FileCommand ..> FileTransferService : "调用"
+HelpCommand ..> Command : "引用"
+ExitCommand ..> NetworkManager : "使用"
+HistoryCommand ..> ChatRepository : "使用"
+ClearCommand ..> MenuDisplay : "使用"
+
+ChatRepository ..> User : "存储"
+ChatRepository ..> Message : "存储和查询"
+
+note "程序入口点，负责初始化环境" as N1
+P2PChatApplication .. N1
+
+note "提供后台任务的框架，由消息服务继承" as N2
+BackgroundService .. N2
+
+note "命令行控制器，负责全局流程控制" as N3
+CliController .. N3
+
+note "聊天会话的核心类，管理聊天过程" as N4
+ChatSession .. N4
+
+note "负责底层网络通信，支持客户端和服务器模式" as N5
+NetworkManager .. N5
+
+note "消息服务类，后台监听并处理消息" as N6
+MessageService .. N6
+
+note "文件传输服务，处理文件的发送和接收" as N7
+FileTransferService .. N7
+
+note "命令模式实现，支持可扩展的命令系统" as N8
+Command .. N8
+
+@enduml 

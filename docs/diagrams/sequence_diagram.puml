@@ -1,0 +1,367 @@
+@startuml P2P聊天系统时序图
+
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 14
+skinparam roundCorner 10
+skinparam shadowing false
+
+skinparam sequence {
+  ArrowColor #000000
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ParticipantBorderColor #000000
+  ParticipantBackgroundColor #FFFFFF
+  ParticipantFontSize 13
+  ActorFontSize 13
+}
+
+title P2P_Chat_System - 核心功能时序图
+
+' 参与者定义
+actor 用户 as User
+participant "P2PChatApplication" as Main
+participant "DirectoryUtils" as DirUtils
+participant "CliController" as Controller
+participant "NetworkUtils" as NetUtils
+participant "NetworkManager" as NetMan
+participant "ChatRepository" as ChatRepo
+participant "MenuDisplay" as Menu
+participant "InputHandler" as Input
+participant "ConnectionHandler" as ConnHandler
+participant "User\n(本地用户)" as LocalUser
+participant "User\n(远程用户)" as RemoteUser
+participant "ChatSession" as Session
+participant "MessageService" as MsgService
+participant "FileTransferService" as FileService
+participant "Command"
+
+== 1. 系统初始化 ==
+User -> Main: 启动应用
+activate Main
+Main -> DirUtils: createDirectoryIfNotExists("downloads")
+activate DirUtils
+DirUtils --> Main: 返回结果
+deactivate DirUtils
+
+Main -> Controller: new CliController(...)
+activate Controller
+Controller -> Controller: getPortFromUser()
+Controller -> User: 提示输入端口
+User -> Controller: 输入端口号
+
+Controller -> NetMan: new NetworkManager(port)
+activate NetMan
+deactivate NetMan
+
+Controller -> ChatRepo: new ChatRepository(sql_path)
+activate ChatRepo
+ChatRepo -> ChatRepo: initDatabase()
+deactivate ChatRepo
+
+Controller -> Controller: getLocalHostname(port)
+Controller -> NetUtils: getHostname()
+activate NetUtils
+NetUtils --> Controller: 返回主机名
+deactivate NetUtils
+
+Controller -> Controller: setupLocalUser(hostname)
+activate Controller
+Controller -> NetUtils: getLocalIpAddress()
+activate NetUtils
+NetUtils --> Controller: 返回IP地址
+deactivate NetUtils
+Controller -> LocalUser: new User(hostname, ip, port)
+deactivate Controller
+
+Controller -> ChatRepo: saveUser(localUser)
+
+loop 主菜单循环
+    Controller -> Menu: 显示主菜单
+    Controller -> User: 提示选择模式 (1.发送 2.接收 3.退出)
+    User -> Controller: 输入选择
+end
+deactivate Controller
+deactivate Main
+
+== 2a. 接收模式选择 ==
+activate Controller
+User -> Controller: 选择 "2" (接收模式)
+Controller -> Controller: receiveMode()
+activate Controller
+Controller -> Menu: 显示接收模式菜单 (等待/返回)
+User -> Controller: 选择 "1" (等待连接)
+
+== 2b. 等待连接与握手 (接收模式) ==
+Controller -> NetMan: startServer(timeout)
+activate NetMan
+Controller -> NetMan: waitForConnection()
+NetMan --> Controller: 客户端已连接
+deactivate NetMan
+
+Controller -> NetMan: receiveHandshakeMessage()
+activate NetMan
+alt 握手成功 (接收到用户名)
+    NetMan --> Controller: 返回对方用户名
+    deactivate NetMan
+    Controller -> NetMan: sendHandshakeMessage(localUser.getUsername())
+    activate NetMan
+    deactivate NetMan
+    Controller -> RemoteUser: new User(username, ip, port)
+    Controller -> Controller: 创建 ChatSession
+    break 进入聊天会话
+else 握手失败 (超时或未收到)
+    NetMan --> Controller: 返回 null 或抛出异常
+    deactivate NetMan
+    Controller -> User: 显示错误信息
+    note right: 返回主菜单
+end
+deactivate Controller
+deactivate Controller
+
+
+== 2c. 连接建立 (发送模式) ==
+activate Controller
+User -> Controller: 选择 "1" (发送模式)
+Controller -> Controller: sendMode()
+activate Controller
+Controller -> ConnHandler: new ConnectionHandler(...)
+activate ConnHandler
+Controller -> ConnHandler: establishConnection()
+
+ConnHandler -> Input: getValidInput("请输入对方IP地址")
+activate Input
+Input --> ConnHandler: 返回IP
+deactivate Input
+
+ConnHandler -> Input: getValidInput("请输入对方端口号")
+activate Input
+Input --> ConnHandler: 返回端口
+deactivate Input
+
+loop 尝试连接 (最多3次)
+    ConnHandler -> NetMan: connectToServer(ip, port)
+    activate NetMan
+    alt 连接成功
+        NetMan --> ConnHandler: 连接成功
+        deactivate NetMan
+        break 连接成功
+    else 连接失败
+        NetMan -->> ConnHandler: IOException
+        deactivate NetMan
+        ConnHandler -> ConnHandler: 等待5秒
+    end
+end
+
+ConnHandler -> ConnHandler: performHandshake(ip, port)
+activate ConnHandler
+ConnHandler -> NetMan: sendHandshakeMessage(localUser.getUsername())
+activate NetMan
+deactivate NetMan
+ConnHandler -> NetMan: receiveHandshakeMessage()
+activate NetMan
+alt 握手成功 (接收到用户名)
+    NetMan --> ConnHandler: 返回对方用户名
+    deactivate NetMan
+    ConnHandler -> RemoteUser: new User(username, ip, port)
+    activate RemoteUser
+    deactivate RemoteUser
+    ConnHandler --> Controller: 返回远程用户实例
+    deactivate ConnHandler
+else 握手失败 (未接收到用户名)
+    NetMan --> ConnHandler: 返回 null
+    deactivate NetMan
+    ConnHandler -> NetMan: closeConnection()
+    activate NetMan
+    deactivate NetMan
+    ConnHandler --> Controller: 返回 null
+    deactivate ConnHandler
+end
+deactivate ConnHandler
+
+alt 连接和握手成功
+    Controller -> Session: new ChatSession(...)
+    activate Session
+    Session -> Session: initCommands()
+    note right: 注册所有可用命令到列表
+    deactivate Session
+    Controller -> Session: start()
+    activate Session
+    Controller --> Session: 控制权移交
+deactivate Controller
+else 连接或握手失败
+    Controller -> Controller: showMainMenu(download_path)
+    note right: 返回主菜单
+deactivate Controller
+end
+
+
+== 3. 会话运行与消息处理 ==
+activate Session
+Session -> Session: initializeFileTransferService()
+
+Session -> Session: showChatHistory()
+activate Session
+Session -> ChatRepo: getChatHistory(...)
+activate ChatRepo
+ChatRepo --> Session: 返回聊天历史
+deactivate ChatRepo
+Session -> User: 显示历史消息
+deactivate Session
+
+Session -> Session: createMessageHandler()
+note right of Session
+  创建实现了 MessageHandler 接口的
+  匿名内部类实例
+end note
+Session -> MsgService: new MessageService(..., messageHandler)
+activate MsgService
+
+Session -> MsgService: start()
+MsgService -> MsgService: 启动后台线程监听消息
+deactivate MsgService
+
+Session -> Session: runChatLoop()
+activate Session
+loop 聊天循环
+    User -> Session: 输入消息 "你好!"
+    Session -> MsgService: sendTextMessage("你好!")
+    activate MsgService
+    MsgService -> NetMan: sendTextMessage("你好!")
+    activate NetMan
+    NetMan -> NetMan: [TCP] "你好!"
+    deactivate NetMan
+    MsgService -> ChatRepo: saveMessage(message)
+    activate ChatRepo
+    deactivate ChatRepo
+    deactivate MsgService
+end
+deactivate Session
+
+
+== 4. 接收消息与命令处理 ==
+NetMan -> MsgService: (后台线程) 接收到消息
+activate MsgService
+MsgService -> Session: (Handler) handleMessage("你好!")
+activate Session
+Session -> User: 显示 "用户A: 你好!"
+deactivate Session
+deactivate MsgService
+
+User -> Session: 输入命令 "/help"
+activate Session
+Session -> Session: handleCommand("/help")
+activate Session
+note right: 在命令列表中查找并执行
+alt 找到命令
+    Session -> Command: execute(context)
+    activate Command
+    Command -> User: 显示命令帮助
+    deactivate Command
+else 未找到命令
+    Session -> User: 显示 "未知命令"
+end
+deactivate Session
+deactivate Session
+
+
+== 5. 文件传输流程 ==
+User -> Session: 输入命令 "/file /path/to/myfile.txt"
+activate Session
+Session -> Session: handleCommand("/file ...")
+activate Session
+Session -> FileCommand: execute(context)
+note right of Session
+  此处特指 FileCommand
+end note
+activate FileCommand
+FileCommand -> FileService: sendFile("/path/to/myfile.txt")
+activate FileService
+
+FileService -> NetMan: sendTextMessage("FILE:myfile.txt")
+activate NetMan
+deactivate NetMan
+
+FileService -> FileService: 读取文件并创建FileInfo
+FileService -> NetMan: sendFile(fileInfo)
+activate NetMan
+deactivate NetMan
+
+FileService -> ChatRepo: saveMessage(message)
+
+FileService --> FileCommand: 返回成功
+deactivate FileService
+deactivate FileCommand
+deactivate Session
+
+
+' 文件接收流程
+NetMan -> MsgService: (后台线程) 接收到消息 "FILE:myfile.txt"
+activate MsgService
+MsgService -> Session: (Handler) handleMessage("FILE:...")
+activate Session
+Session -> Session: handleFileReceive()
+activate Session
+
+Session -> FileService: receiveFile()
+activate FileService
+FileService -> NetMan: receiveFile()
+activate NetMan
+NetMan --> FileService: 返回FileInfo对象
+deactivate NetMan
+FileService -> FileService: 写入文件数据
+FileService -> ChatRepo: saveMessage(message)
+FileService --> Session: 返回文件路径
+deactivate FileService
+
+Session -> User: 显示 "文件接收成功"
+deactivate Session
+deactivate Session
+deactivate MsgService
+
+
+== 6. 会话结束 (用户发起) ==
+User -> Session: 输入命令 "/exit"
+activate Session
+Session -> Session: handleCommand("/exit")
+activate Session
+Session -> ExitCommand: execute(context)
+note right of Session
+  此处特指 ExitCommand
+end note
+activate ExitCommand
+ExitCommand --> Session: 返回 false
+deactivate ExitCommand
+deactivate Session
+
+note right of Session
+  runChatLoop 循环因返回 false 而终止,
+  进入 start() 方法的 finally 块
+end note
+
+Session -> Session: shutdownChat(false)
+activate Session
+Session -> MsgService: stop()
+deactivate Session
+
+note right of Session
+  连接资源由更高层级的
+  CliController 在会话结束后管理和关闭
+end note
+
+
+== 7. 会话结束 (对方发起) ==
+NetMan -> MsgService: (后台线程) 接收到 "CHAT_CLOSE_NOTIFY"
+activate MsgService
+MsgService -> Session: (Handler) handleMessage("CHAT_CLOSE_NOTIFY")
+activate Session
+Session -> Session: shutdownChat(false)
+activate Session
+Session -> MsgService: stop()
+deactivate Session
+Session -> User: 显示 "对方已退出聊天"
+deactivate Session
+deactivate MsgService
+
+@enduml 
